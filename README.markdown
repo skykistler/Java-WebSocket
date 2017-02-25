@@ -1,5 +1,13 @@
 [![Build Status](https://travis-ci.org/ck1125/Java-WebSocket.png?branch=master)](https://travis-ci.org/ck1125/Java-WebSocket)
-Java WebSockets
+Java WebSockets - High Performance
+===============
+
+In this fork, I implemented a custom cache provider for all the byte buffers being passed around. 
+
+If you needed to stream video frames, the original implementation would quickly reach the memory limit and either fail or put unnecessary strain on Java GC. This fork may help alleviate your issues!
+
+
+Original README
 ===============
 
 This repository contains a barebones WebSocket server and client implementation

@@ -408,8 +408,8 @@ public abstract class WebSocketServer extends WebSocketAdapter implements Runnab
 	}
 
 	protected void releaseBuffers( WebSocket c ) throws InterruptedException {
-		queuesize.decrementAndGet();
-		DisposedBytesProvider.getInstance().disposeBytes( takeBuffer() );
+//		queuesize.decrementAndGet();
+//		DisposedBytesProvider.getInstance().disposeBytes( takeBuffer() );
 	}
 
 	public ByteBuffer createBuffer() {

@@ -27,6 +27,7 @@ import org.java_websocket.handshake.ServerHandshake;
 import org.java_websocket.handshake.ServerHandshakeBuilder;
 import org.java_websocket.util.Base64;
 import org.java_websocket.util.Charsetfunctions;
+import org.java_websocket.util.DisposedBytesProvider;
 
 public class Draft_10 extends Draft {
 
@@ -93,7 +94,7 @@ public class Draft_10 extends Draft {
 		ByteBuffer mes = framedata.getPayloadData();
 		boolean mask = role == Role.CLIENT; // framedata.getTransfereMasked();
 		int sizebytes = mes.remaining() <= 125 ? 1 : mes.remaining() <= 65535 ? 2 : 8;
-		ByteBuffer buf = ByteBuffer.allocate( 1 + ( sizebytes > 1 ? sizebytes + 1 : sizebytes ) + ( mask ? 4 : 0 ) + mes.remaining() );
+		ByteBuffer buf = DisposedBytesProvider.getInstance().getDisposedBytes( 1 + ( sizebytes > 1 ? sizebytes + 1 : sizebytes ) + ( mask ? 4 : 0 ) + mes.remaining(), true );
 		byte optcode = fromOpcode( framedata.getOpcode() );
 		byte one = (byte) ( framedata.isFin() ? -128 : 0 );
 		one |= optcode;
@@ -102,7 +103,7 @@ public class Draft_10 extends Draft {
 		assert ( payloadlengthbytes.length == sizebytes );
 
 		if( sizebytes == 1 ) {
-			buf.put( (byte) ( (byte) payloadlengthbytes[ 0 ] | ( mask ? (byte) -128 : 0 ) ) );
+			buf.put( (byte) ( payloadlengthbytes[ 0 ] | ( mask ? (byte) -128 : 0 ) ) );
 		} else if( sizebytes == 2 ) {
 			buf.put( (byte) ( (byte) 126 | ( mask ? (byte) -128 : 0 ) ) );
 			buf.put( payloadlengthbytes );
@@ -226,14 +227,14 @@ public class Draft_10 extends Draft {
 				return Opcode.TEXT;
 			case 2:
 				return Opcode.BINARY;
-				// 3-7 are not yet defined
+			// 3-7 are not yet defined
 			case 8:
 				return Opcode.CLOSING;
 			case 9:
 				return Opcode.PING;
 			case 10:
 				return Opcode.PONG;
-				// 11-15 are not yet defined
+			// 11-15 are not yet defined
 			default :
 				throw new InvalidFrameException( "unknow optcode " + (short) opcode );
 		}
@@ -263,17 +264,21 @@ public class Draft_10 extends Draft {
 
 					cur = translateSingleFrame( (ByteBuffer) incompleteframe.duplicate().position( 0 ) );
 					frames.add( cur );
+
+					DisposedBytesProvider.getInstance().disposeBytes( incompleteframe );
 					incompleteframe = null;
 					break; // go on with the normal frame receival
 				} catch ( IncompleteException e ) {
 					// extending as much as suggested
 					int oldsize = incompleteframe.limit();
-					ByteBuffer extendedframe = ByteBuffer.allocate( checkAlloc( e.getPreferedSize() ) );
+					ByteBuffer extendedframe = DisposedBytesProvider.getInstance().getDisposedBytes( checkAlloc( e.getPreferedSize() ), true );
 					assert ( extendedframe.limit() > incompleteframe.limit() );
 					incompleteframe.rewind();
 					extendedframe.put( incompleteframe );
+
+					DisposedBytesProvider.getInstance().disposeBytes( incompleteframe );
 					incompleteframe = extendedframe;
-					
+
 					return translateFrame( buffer );
 				}
 			}
@@ -288,7 +293,7 @@ public class Draft_10 extends Draft {
 				// remember the incomplete data
 				buffer.reset();
 				int pref = e.getPreferedSize();
-				incompleteframe = ByteBuffer.allocate( checkAlloc( pref ) );
+				incompleteframe = DisposedBytesProvider.getInstance().getDisposedBytes( checkAlloc( pref ), true );
 				incompleteframe.put( buffer );
 				break;
 			}
@@ -301,12 +306,12 @@ public class Draft_10 extends Draft {
 		int realpacketsize = 2;
 		if( maxpacketsize < realpacketsize )
 			throw new IncompleteException( realpacketsize );
-		byte b1 = buffer.get( /*0*/);
+		byte b1 = buffer.get( /*0*/ );
 		boolean FIN = b1 >> 8 != 0;
 		byte rsv = (byte) ( ( b1 & ~(byte) 128 ) >> 4 );
 		if( rsv != 0 )
 			throw new InvalidFrameException( "bad rsv " + rsv );
-		byte b2 = buffer.get( /*1*/);
+		byte b2 = buffer.get( /*1*/ );
 		boolean MASK = ( b2 & -128 ) != 0;
 		int payloadlength = (byte) ( b2 & ~(byte) 128 );
 		Opcode optcode = toOpcode( (byte) ( b1 & 15 ) );
@@ -327,8 +332,8 @@ public class Draft_10 extends Draft {
 				if( maxpacketsize < realpacketsize )
 					throw new IncompleteException( realpacketsize );
 				byte[] sizebytes = new byte[ 3 ];
-				sizebytes[ 1 ] = buffer.get( /*1 + 1*/);
-				sizebytes[ 2 ] = buffer.get( /*1 + 2*/);
+				sizebytes[ 1 ] = buffer.get( /*1 + 1*/ );
+				sizebytes[ 2 ] = buffer.get( /*1 + 2*/ );
 				payloadlength = new BigInteger( sizebytes ).intValue();
 			} else {
 				realpacketsize += 8; // additional length bytes
@@ -336,7 +341,7 @@ public class Draft_10 extends Draft {
 					throw new IncompleteException( realpacketsize );
 				byte[] bytes = new byte[ 8 ];
 				for( int i = 0 ; i < 8 ; i++ ) {
-					bytes[ i ] = buffer.get( /*1 + i*/);
+					bytes[ i ] = buffer.get( /*1 + i*/ );
 				}
 				long length = new BigInteger( bytes ).longValue();
 				if( length > Integer.MAX_VALUE ) {
@@ -355,12 +360,12 @@ public class Draft_10 extends Draft {
 		if( maxpacketsize < realpacketsize )
 			throw new IncompleteException( realpacketsize );
 
-		ByteBuffer payload = ByteBuffer.allocate( checkAlloc( payloadlength ) );
+		ByteBuffer payload = DisposedBytesProvider.getInstance().getDisposedBytes( checkAlloc( payloadlength ), false );
 		if( MASK ) {
 			byte[] maskskey = new byte[ 4 ];
 			buffer.get( maskskey );
 			for( int i = 0 ; i < payloadlength ; i++ ) {
-				payload.put( (byte) ( (byte) buffer.get( /*payloadstart + i*/) ^ (byte) maskskey[ i % 4 ] ) );
+				payload.put( (byte) ( buffer.get( /*payloadstart + i*/ ) ^ maskskey[ i % 4 ] ) );
 			}
 		} else {
 			payload.put( buffer.array(), buffer.position(), payload.limit() );

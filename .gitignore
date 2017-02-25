@@ -12,5 +12,6 @@ target
 .project
 .classpath
 bin
+**/.DS_Store
 
 /doc

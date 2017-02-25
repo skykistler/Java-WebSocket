@@ -41,6 +41,7 @@ import org.java_websocket.framing.Framedata;
 import org.java_websocket.handshake.ClientHandshake;
 import org.java_websocket.handshake.Handshakedata;
 import org.java_websocket.handshake.ServerHandshakeBuilder;
+import org.java_websocket.util.DisposedBytesProvider;
 
 /**
  * <tt>WebSocketServer</tt> is an abstract class that only takes care of the
@@ -260,6 +261,7 @@ public abstract class WebSocketServer extends WebSocketAdapter implements Runnab
 	}
 
 	// Runnable IMPLEMENTATION /////////////////////////////////////////////////
+	@Override
 	public void run() {
 		synchronized ( this ) {
 			if( selectorthread != null )
@@ -406,12 +408,12 @@ public abstract class WebSocketServer extends WebSocketAdapter implements Runnab
 	}
 
 	protected void releaseBuffers( WebSocket c ) throws InterruptedException {
-		// queuesize.decrementAndGet();
-		// takeBuffer();
+		queuesize.decrementAndGet();
+		DisposedBytesProvider.getInstance().disposeBytes( takeBuffer() );
 	}
 
 	public ByteBuffer createBuffer() {
-		return ByteBuffer.allocate( WebSocketImpl.RCVBUF );
+		return DisposedBytesProvider.getInstance().getDisposedBytes( WebSocketImpl.RCVBUF, true );
 	}
 
 	private void queue( WebSocketImpl ws ) throws InterruptedException {
@@ -607,7 +609,7 @@ public abstract class WebSocketServer extends WebSocketAdapter implements Runnab
 	 * Therefore method is well suited to implement some kind of connection limitation.<br>
 	 * 
 	 * @see #onOpen(WebSocket, ClientHandshake)
-         * @see #onWebsocketHandshakeReceivedAsServer(WebSocket, Draft, ClientHandshake)
+	 * @see #onWebsocketHandshakeReceivedAsServer(WebSocket, Draft, ClientHandshake)
 	 **/
 	protected boolean onConnect( SelectionKey key ) {
 		return true;
@@ -700,10 +702,10 @@ public abstract class WebSocketServer extends WebSocketAdapter implements Runnab
 					assert ( buf != null );
 					try {
 						ws.decode( buf );
-					} catch(Exception e){
-						System.err.println("Error while reading from remote connection: " + e);
+					} catch ( Exception e ) {
+						System.err.println( "Error while reading from remote connection: " + e );
 					}
-					
+
 					finally {
 						pushBuffer( buf );
 					}
@@ -719,6 +721,7 @@ public abstract class WebSocketServer extends WebSocketAdapter implements Runnab
 		@Override
 		public WebSocketImpl createWebSocket( WebSocketAdapter a, Draft d, Socket s );
 
+		@Override
 		public WebSocketImpl createWebSocket( WebSocketAdapter a, List<Draft> drafts, Socket s );
 
 		/**

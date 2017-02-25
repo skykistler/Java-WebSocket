@@ -35,6 +35,7 @@ import org.java_websocket.handshake.ServerHandshake;
 import org.java_websocket.handshake.ServerHandshakeBuilder;
 import org.java_websocket.server.WebSocketServer.WebSocketWorker;
 import org.java_websocket.util.Charsetfunctions;
+import org.java_websocket.util.DisposedBytesProvider;
 
 /**
  * Represents one end (client or server) of a single WebSocketImpl connection.
@@ -101,7 +102,7 @@ public class WebSocketImpl implements WebSocket {
 	private String closemessage = null;
 	private Integer closecode = null;
 	private Boolean closedremotely = null;
-	
+
 	private String resourceDescriptor = null;
 
 	/**
@@ -179,9 +180,11 @@ public class WebSocketImpl implements WebSocket {
 			socketBuffer = socketBufferNew;
 		} else {
 			if( tmpHandshakeBytes.remaining() < socketBufferNew.remaining() ) {
-				ByteBuffer buf = ByteBuffer.allocate( tmpHandshakeBytes.capacity() + socketBufferNew.remaining() );
+				ByteBuffer buf = DisposedBytesProvider.getInstance().getDisposedBytes( tmpHandshakeBytes.capacity() + socketBufferNew.remaining(), false );
 				tmpHandshakeBytes.flip();
 				buf.put( tmpHandshakeBytes );
+
+				DisposedBytesProvider.getInstance().disposeBytes( tmpHandshakeBytes );
 				tmpHandshakeBytes = buf;
 			}
 
@@ -385,6 +388,8 @@ public class WebSocketImpl implements WebSocket {
 				} else {
 					throw new InvalidDataException( CloseFrame.PROTOCOL_ERROR, "non control or continious frame expected" );
 				}
+
+				DisposedBytesProvider.getInstance().disposeBytes( f.getPayloadData() );
 			}
 		} catch ( InvalidDataException e1 ) {
 			wsl.onWebsocketError( this, e1 );
@@ -472,7 +477,13 @@ public class WebSocketImpl implements WebSocket {
 		handshakerequest = null;
 
 		readystate = READYSTATE.CLOSED;
+
+		ByteBuffer[] remainingQueue = this.outQueue.toArray( new ByteBuffer[ 0 ] );
 		this.outQueue.clear();
+
+		for( ByteBuffer disposable : remainingQueue ) {
+			DisposedBytesProvider.getInstance().disposeBytes( disposable );
+		}
 	}
 
 	protected void closeConnection( int code, boolean remote ) {
@@ -486,6 +497,7 @@ public class WebSocketImpl implements WebSocket {
 		closeConnection( closecode, closemessage, closedremotely );
 	}
 
+	@Override
 	public void closeConnection( int code, String message ) {
 		closeConnection( code, message, false );
 	}
@@ -586,6 +598,8 @@ public class WebSocketImpl implements WebSocket {
 		if( DEBUG )
 			System.out.println( "send frame: " + framedata );
 		write( draft.createBinaryFrame( framedata ) );
+
+		DisposedBytesProvider.getInstance().disposeBytes( framedata.getPayloadData() );
 	}
 
 	@Override
@@ -618,8 +632,8 @@ public class WebSocketImpl implements WebSocket {
 		this.handshakerequest = draft.postProcessHandshakeRequestAsClient( handshakedata );
 
 		resourceDescriptor = handshakedata.getResourceDescriptor();
-		assert( resourceDescriptor != null );
-		
+		assert ( resourceDescriptor != null );
+
 		// Notify Listener
 		try {
 			wsl.onWebsocketHandshakeSentAsClient( this, this.handshakerequest );

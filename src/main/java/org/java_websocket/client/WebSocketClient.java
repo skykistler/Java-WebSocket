@@ -24,6 +24,7 @@ import org.java_websocket.framing.Framedata.Opcode;
 import org.java_websocket.handshake.HandshakeImpl1Client;
 import org.java_websocket.handshake.Handshakedata;
 import org.java_websocket.handshake.ServerHandshake;
+import org.java_websocket.util.DisposedBytesProvider;
 
 /**
  * A subclass must implement at least <var>onOpen</var>, <var>onClose</var>, and <var>onMessage</var> to be
@@ -96,6 +97,7 @@ public abstract class WebSocketClient extends WebSocketAdapter implements Runnab
 	 * Returns the protocol version this channel uses.<br>
 	 * For more infos see https://github.com/TooTallNate/Java-WebSocket/wiki/Drafts
 	 */
+	@Override
 	public Draft getDraft() {
 		return draft;
 	}
@@ -124,6 +126,7 @@ public abstract class WebSocketClient extends WebSocketAdapter implements Runnab
 	 * Initiates the websocket close handshake. This method does not block<br>
 	 * In oder to make sure the connection is closed use <code>closeBlocking</code>
 	 */
+	@Override
 	public void close() {
 		if( writeThread != null ) {
 			engine.close( CloseFrame.NORMAL );
@@ -141,6 +144,7 @@ public abstract class WebSocketClient extends WebSocketAdapter implements Runnab
 	 * @param text
 	 *            The string which will be transmitted.
 	 */
+	@Override
 	public void send( String text ) throws NotYetConnectedException {
 		engine.send( text );
 	}
@@ -151,10 +155,12 @@ public abstract class WebSocketClient extends WebSocketAdapter implements Runnab
 	 * @param data
 	 *            The byte-Array of data to send to the WebSocket server.
 	 */
+	@Override
 	public void send( byte[] data ) throws NotYetConnectedException {
 		engine.send( data );
 	}
 
+	@Override
 	public void run() {
 		try {
 			if( socket == null ) {
@@ -236,6 +242,7 @@ public abstract class WebSocketClient extends WebSocketAdapter implements Runnab
 	/**
 	 * This represents the state of the connection.
 	 */
+	@Override
 	public READYSTATE getReadyState() {
 		return engine.getReadyState();
 	}
@@ -351,6 +358,8 @@ public abstract class WebSocketClient extends WebSocketAdapter implements Runnab
 					ByteBuffer buffer = engine.outQueue.take();
 					ostream.write( buffer.array(), 0, buffer.limit() );
 					ostream.flush();
+
+					DisposedBytesProvider.getInstance().disposeBytes( buffer );
 				}
 			} catch ( IOException e ) {
 				engine.eot();
@@ -446,7 +455,7 @@ public abstract class WebSocketClient extends WebSocketAdapter implements Runnab
 	public InetSocketAddress getRemoteSocketAddress() {
 		return engine.getRemoteSocketAddress();
 	}
-	
+
 	@Override
 	public String getResourceDescriptor() {
 		return uri.getPath();

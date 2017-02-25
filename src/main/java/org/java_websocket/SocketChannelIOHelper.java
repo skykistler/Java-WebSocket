@@ -3,9 +3,9 @@ package org.java_websocket;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.ByteChannel;
-import java.nio.channels.spi.AbstractSelectableChannel;
 
 import org.java_websocket.WebSocket.Role;
+import org.java_websocket.util.DisposedBytesProvider;
 
 public class SocketChannelIOHelper {
 
@@ -50,12 +50,15 @@ public class SocketChannelIOHelper {
 				}
 			}
 		} else {
-			do {// FIXME writing as much as possible is unfair!!
+			do {
+				// FIXME writing as much as possible is unfair!!
 				/*int written = */sockchannel.write( buffer );
 				if( buffer.remaining() > 0 ) {
 					return false;
 				} else {
-					ws.outQueue.poll(); // Buffer finished. Remove it.
+					ByteBuffer toDispose = ws.outQueue.poll(); // Buffer finished. Remove it.
+					DisposedBytesProvider.getInstance().disposeBytes( toDispose );
+
 					buffer = ws.outQueue.peek();
 				}
 			} while ( buffer != null );

@@ -5,6 +5,7 @@ import java.nio.ByteBuffer;
 import org.java_websocket.exceptions.InvalidDataException;
 import org.java_websocket.exceptions.InvalidFrameException;
 import org.java_websocket.util.Charsetfunctions;
+import org.java_websocket.util.DisposedBytesProvider;
 
 public class CloseFrameBuilder extends FramedataImpl1 implements CloseFrame {
 
@@ -50,7 +51,8 @@ public class CloseFrameBuilder extends FramedataImpl1 implements CloseFrame {
 		ByteBuffer buf = ByteBuffer.allocate( 4 );
 		buf.putInt( code );
 		buf.position( 2 );
-		ByteBuffer pay = ByteBuffer.allocate( 2 + by.length );
+
+		ByteBuffer pay = DisposedBytesProvider.getInstance().getDisposedBytes( 2 + by.length, false );
 		pay.put( buf );
 		pay.put( by );
 		pay.rewind();

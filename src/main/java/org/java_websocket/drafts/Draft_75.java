@@ -22,6 +22,7 @@ import org.java_websocket.handshake.HandshakeBuilder;
 import org.java_websocket.handshake.ServerHandshake;
 import org.java_websocket.handshake.ServerHandshakeBuilder;
 import org.java_websocket.util.Charsetfunctions;
+import org.java_websocket.util.DisposedBytesProvider;
 
 public class Draft_75 extends Draft {
 
@@ -70,13 +71,17 @@ public class Draft_75 extends Draft {
 		}
 
 		ByteBuffer pay = framedata.getPayloadData();
-		ByteBuffer b = ByteBuffer.allocate( pay.remaining() + 2 );
+		ByteBuffer b = DisposedBytesProvider.getInstance().getDisposedBytes( pay.remaining() + 2, false );
 		b.put( START_OF_FRAME );
+
 		pay.mark();
+
 		b.put( pay );
 		pay.reset();
+
 		b.put( END_OF_FRAME );
 		b.flip();
+
 		return b;
 	}
 
@@ -123,9 +128,10 @@ public class Draft_75 extends Draft {
 	}
 
 	protected List<Framedata> translateRegularFrame( ByteBuffer buffer ) throws InvalidDataException {
+		byte newestByte;
 
 		while ( buffer.hasRemaining() ) {
-			byte newestByte = buffer.get();
+			newestByte = buffer.get();
 			if( newestByte == START_OF_FRAME ) { // Beginning of Frame
 				if( readingState )
 					throw new InvalidFrameException( "unexpected START_OF_FRAME" );
@@ -189,12 +195,12 @@ public class Draft_75 extends Draft {
 	}
 
 	public ByteBuffer createBuffer() {
-		return ByteBuffer.allocate( INITIAL_FAMESIZE );
+		return DisposedBytesProvider.getInstance().getDisposedBytes( INITIAL_FAMESIZE, true );
 	}
 
 	public ByteBuffer increaseBuffer( ByteBuffer full ) throws LimitExedeedException , InvalidDataException {
 		full.flip();
-		ByteBuffer newbuffer = ByteBuffer.allocate( checkAlloc( full.capacity() * 2 ) );
+		ByteBuffer newbuffer = DisposedBytesProvider.getInstance().getDisposedBytes( checkAlloc( full.capacity() * 2 ), true );
 		newbuffer.put( full );
 		return newbuffer;
 	}
